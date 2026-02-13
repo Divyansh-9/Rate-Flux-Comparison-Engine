@@ -1,4 +1,4 @@
-# Price Comparison Engine
+# Rate Flux Comparison Engine
 
 > A production-grade, microservices-based price comparison platform that aggregates product data from multiple e-commerce retailers in real-time.
 
