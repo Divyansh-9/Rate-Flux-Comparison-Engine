@@ -231,7 +231,6 @@ curl http://localhost:5000/health
 - [x] Non-blocking Redis queue consumer (ThreadPoolExecutor)
 - [x] Flipkart scraper scaffold added
 - [x] MongoDB connection layer (planned for Phase 2)
-- [x] GitHub repository with professional README
 - [ ] MongoDB models and schema
 - [ ] Health check endpoints
 - [ ] API scrape endpoint implementation
