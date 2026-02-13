@@ -7,7 +7,7 @@ import asyncio
 import json
 import signal
 import sys
-import time
+from concurrent.futures import ThreadPoolExecutor
 
 from loguru import logger
 
@@ -21,18 +21,14 @@ from src.db.repository import save_results
 logger.remove()
 logger.add(sys.stderr, level=settings.log_level)
 
-running = True
+# Shutdown event for graceful termination
+shutdown_event = asyncio.Event()
 
 
-def shutdown(signum, _frame):
+def shutdown_handler(signum, _frame):
     """Graceful shutdown handler."""
-    global running
     logger.info(f"Received signal {signum}, shutting down …")
-    running = False
-
-
-signal.signal(signal.SIGINT, shutdown)
-signal.signal(signal.SIGTERM, shutdown)
+    shutdown_event.set()
 
 
 async def process_job(payload: dict) -> None:
@@ -59,39 +55,59 @@ async def process_job(payload: dict) -> None:
         logger.warning(f"No results found for '{query}'")
 
 
-def main() -> None:
+async def main() -> None:
+    """Main async worker loop."""
     logger.info("Scraper worker starting …")
     logger.info(f"Queue: {settings.queue_name}")
 
+    # Setup signal handlers
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
+
+    # Initialize connections
     redis_client = create_redis_client()
     _ = get_db()  # warm connection
 
+    # Thread pool for blocking Redis operations
+    executor = ThreadPoolExecutor(max_workers=1)
+    loop = asyncio.get_running_loop()
+
     logger.info("Worker ready – waiting for jobs …")
 
-    while running:
-        try:
-            # BRPOP blocks until a message arrives (timeout = poll interval)
-            result = redis_client.brpop(
-                settings.queue_name, timeout=settings.queue_poll_interval
-            )
-            if result is None:
-                continue
+    try:
+        while not shutdown_event.is_set():
+            try:
+                # Wrap blocking BRPOP in executor to avoid blocking event loop
+                result = await loop.run_in_executor(
+                    executor,
+                    lambda: redis_client.brpop(
+                        settings.queue_name, timeout=settings.queue_poll_interval
+                    ),
+                )
 
-            _, raw = result
-            payload = json.loads(raw)
-            asyncio.run(process_job(payload))
+                if result is None:
+                    continue
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in queue: {e}")
-        except Exception as e:
-            logger.error(f"Job failed: {e}")
-            time.sleep(2)  # back-off on unexpected errors
+                _, raw = result
+                payload = json.loads(raw)
+                
+                # Process job asynchronously
+                await process_job(payload)
 
-    # ── Cleanup ──
-    redis_client.close()
-    close_db()
-    logger.info("Worker shut down cleanly.")
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in queue: {e}")
+            except Exception as e:
+                logger.error(f"Job failed: {e}")
+                await asyncio.sleep(2)  # async back-off on unexpected errors
+
+    finally:
+        # ── Cleanup ──
+        logger.info("Shutting down worker …")
+        executor.shutdown(wait=True)
+        redis_client.close()
+        close_db()
+        logger.info("Worker shut down cleanly.")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
