@@ -4,7 +4,14 @@
 
 ## 📋 Overview
 
-The API service is the central orchestration layer built with Express and TypeScript. It handles incoming requests from the client, manages job queuing to Redis, and retrieves product data from MongoDB.
+The API service is the central orchestration layer built with Express and TypeScript. It handles incoming requests from the client, publishes scrape jobs to Redis queue with structured payloads, and retrieves product data from MongoDB.
+
+**Core Responsibilities:**
+- ✅ Accept scrape requests from frontend
+- ✅ Publish structured job payloads to Redis queue
+- ✅ Serve cached product results from MongoDB
+- ✅ Validate request parameters
+- ✅ Handle errors and provide meaningful responses
 
 ## 🏗️ Architecture
 
@@ -36,10 +43,18 @@ src/
 ### Design Pattern: MVC + Service Layer
 
 ```
-Request → Route → Controller → Service → Model → Database
+Request → Route → Controller → Service → Model → MongoDB
                                     ↓
-                                  Redis Queue
+                            Redis Queue (Publisher)
+                                    ↓
+                        Job: {query, retailer}
 ```
+
+**Key Architectural Decisions:**
+- **Queue-based decoupling:** API doesn't wait for scraping to complete
+- **Structured payloads:** Explicit `{query, retailer}` contract
+- **Document storage:** MongoDB for flexible product schemas
+- **Connection pooling:** Reused connections for performance
 
 ## 🛠️ Technology Stack
 
@@ -47,9 +62,15 @@ Request → Route → Controller → Service → Model → Database
 - **Framework:** Express 4
 - **Language:** TypeScript
 - **Database:** MongoDB (via Mongoose)
-- **Queue/Cache:** Redis (via ioredis)
+- **Queue:** Redis (via ioredis) - Publisher only
 - **Validation:** Zod (planned)
 - **Package Manager:** npm
+
+**Why These Choices:**
+- **Express:** Mature, lightweight, extensive middleware ecosystem
+- **MongoDB:** Document-based storage suits variable product schemas from different retailers
+- **Redis Queue:** Decouples API from scraping worker, enables async processing
+- **Mongoose:** Type-safe MongoDB ODM with schema validation
 
 ## 🎯 Core Responsibilities
 
@@ -57,26 +78,29 @@ Request → Route → Controller → Service → Model → Database
 - ✅ Express server setup
 - ✅ TypeScript configuration
 - ✅ Redis integration (ioredis)
-- ⬜ MongoDB connection
+- ✅ Queue publishing with structured payloads
+- ⬜ MongoDB connection with Mongoose
 - ⬜ Health check endpoint
 - ⬜ Error handling middleware
 
 ### Phase 2 (MVP)
-- ⬜ POST `/api/scrape` - Enqueue scrape job
-- ⬜ GET `/api/products` - Search products
+- ⬜ POST `/api/scrape` - Publish scrape jobs with retailer
+- ⬜ GET `/api/products` - Search products from MongoDB
 - ⬜ Product service layer
-- ⬜ MongoDB schema and models
-- ⬜ Request validation
+- ⬜ Mongoose schemas and models
+- ⬜ Request validation with Zod
 - ⬜ CORS configuration
+- ⬜ MongoDB indexes for performance
 
 ### Phase 3 (Production)
-- ⬜ Rate limiting
+- ⬜ Rate limiting per IP
 - ⬜ Authentication (JWT)
-- ⬜ Request logging
+- ⬜ Request logging (Winston)
 - ⬜ API documentation (Swagger)
-- ⬜ Caching strategy
-- ⬜ Monitoring endpoints
+- ⬜ Response caching strategy
+- ⬜ Health metrics endpoint
 - ⬜ Graceful shutdown
+- ⬜ Integration tests
 
 ## 🚀 Getting Started
 
@@ -142,15 +166,28 @@ POST /api/scrape
 Content-Type: application/json
 
 {
-  "query": "iphone 15"
+  "query": "iphone 15",
+  "retailer": "amazon"
 }
 ```
+
+**Request Body:**
+- `query` (string, required): Search term
+- `retailer` (string, required): Retailer to scrape. Supported: `amazon`, `flipkart`
 
 **Response:**
 ```json
 {
   "jobId": "job_123",
-  "message": "Scrape job queued successfully"
+  "message": "Scrape job queued successfully",
+  "retailer": "amazon"
+}
+```
+
+**Error Response (Invalid Retailer):**
+```json
+{
+  "error": "Unsupported retailer: ebay. Supported retailers: amazon, flipkart"
 }
 ```
 
@@ -209,17 +246,26 @@ interface Product {
 ## 📦 Key Files
 
 ### `src/lib/redis.ts`
-Redis client and queue operations
+Redis client and queue publishing
 
 ```typescript
-export async function enqueueScrapeJob(query: string): Promise<void> {
+export async function enqueueScrapeJob(
+  query: string, 
+  retailer: string
+): Promise<void> {
   const payload = JSON.stringify({ 
-    query, 
+    query,
+    retailer,
     createdAt: new Date().toISOString() 
   });
   await getRedis().lpush(SCRAPE_QUEUE, payload);
 }
 ```
+
+**Key Points:**
+- Uses `LPUSH` to add jobs to queue (worker uses `BRPOP` to consume)
+- Payload is **structured** with explicit `retailer` field
+- Includes `createdAt` timestamp for job tracking
 
 ### `src/controllers/product.controller.ts`
 Request handlers
@@ -255,16 +301,156 @@ npm test
 # Integration tests
 npm run test:integration
 
-# Test queue
+# Test queue publishing
 ts-node scripts/test-queue.ts
 ```
+
+**Test Queue Script Example:**
+```typescript
+// scripts/test-queue.ts
+import { enqueueScrapeJob } from '../src/lib/redis';
+
+async function testQueue() {
+  await enqueueScrapeJob('iphone 15', 'amazon');
+  console.log('✓ Job published to queue');
+}
+
+testQueue();
+```
+
+---
+
+## 📤 Queue Publishing Contract
+
+### Structured Job Payload
+
+The API publishes jobs to Redis queue `scrape:jobs` with the following structure:
+
+```json
+{
+  "query": "iphone 15",
+  "retailer": "amazon",
+  "createdAt": "2026-02-13T10:30:00.000Z"
+}
+```
+
+**Field Specifications:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | `string` | ✅ Yes | User's search term |
+| `retailer` | `string` | ✅ Yes | Target retailer (`amazon`, `flipkart`) |
+| `createdAt` | `string` (ISO 8601) | ✅ Yes | Job creation timestamp |
+
+### Publishing Flow
+
+```typescript
+// 1. Client sends request
+POST /api/scrape
+{
+  "query": "iphone 15",
+  "retailer": "amazon"
+}
+
+// 2. API validates request
+if (!query || !retailer) {
+  return res.status(400).json({ error: 'Missing required fields' });
+}
+
+// 3. API publishes to Redis
+await redis.lpush('scrape:jobs', JSON.stringify({
+  query,
+  retailer,
+  createdAt: new Date().toISOString()
+}));
+
+// 4. API responds immediately
+res.json({ 
+  message: 'Job queued',
+  jobId: generateJobId() 
+});
+
+// 5. Worker picks up job asynchronously (in background)
+```
+
+### Why Queue-Based Decoupling?
+
+#### Without Queue (Synchronous)
+```
+❌ Client → API → [Wait for scraping...] → Response
+   - API blocks for 10-30 seconds
+   - Timeout issues
+   - Poor user experience
+   - Can't scale workers independently
+```
+
+#### With Queue (Asynchronous)
+```
+✅ Client → API → Redis Queue → Response (immediate)
+                      ↓
+                   Worker (async)
+                      ↓
+                   MongoDB
+```
+
+**Benefits:**
+
+1. **Instant Response**
+   - API returns immediately (~10ms)
+   - Client doesn't wait for scraping
+   - Better UX
+
+2. **Fault Tolerance**
+   - Jobs persist in Redis if worker crashes
+   - No lost requests
+   - Can retry failed jobs
+
+3. **Independent Scaling**
+   - Scale API horizontally (request handling)
+   - Scale workers horizontally (scraping capacity)
+   - Different resource requirements
+
+4. **Rate Limiting**
+   - Control scraping rate to avoid bans
+   - Queue acts as buffer
+   - Workers process at safe pace
+
+5. **Load Balancing**
+   - Multiple workers consume same queue
+   - Redis `BRPOP` is atomic (no duplication)
+   - Automatic distribution
+
+6. **Technology Decoupling**
+   - API in Node.js (fast I/O)
+   - Worker in Python (Playwright support)
+   - Best tool for each job
+
+### Monitoring Queue Health
+
+```typescript
+// Check queue depth
+const queueLength = await redis.llen('scrape:jobs');
+
+if (queueLength > 1000) {
+  console.warn('Queue backlog detected, scale workers');
+}
+```
+
+**Metrics to Track:**
+- Queue depth (jobs waiting)
+- Processing rate (jobs/minute)
+- Failed jobs (DLQ)
+- Average wait time
+
+---
 
 ## 📊 Performance Considerations
 
 - **Connection Pooling:** MongoDB and Redis connections are reused
-- **Caching:** Redis caches frequently accessed products
-- **Indexing:** MongoDB indexes on query fields
-- **Pagination:** Limit response sizes with pagination
+- **Queue-Based Async:** API responds instantly, scraping happens in background
+- **MongoDB Indexes:** Query, retailer, and price fields indexed for fast lookups
+- **Pagination:** Limit response sizes with offset-based pagination
+- **No Blocking Operations:** All I/O is non-blocking (async/await throughout)
 
 ## 🔒 Security
 
@@ -311,13 +497,26 @@ ts-node scripts/test-queue.ts
 
 ## 📝 Change Log
 
-### 2026-02-13
-- Installed ioredis dependency
-- Enhanced documentation
-- Added comprehensive API specifications
-- Documented all three phases
+### 2026-02-13 (Evening) - Queue Publishing & MongoDB Migration
+- **[BREAKING]** Updated `enqueueScrapeJob()` to require both `query` and `retailer` parameters
+- **[ARCHITECTURE]** Clarified API role as Redis queue publisher (not consumer)
+- Added "Queue Publishing Contract" section with detailed payload specification
+- Documented queue-based decoupling benefits (6 key advantages)
+- Added queue monitoring guidance
+- Updated all code examples to include `retailer` field
+- Enhanced architecture diagram showing structured payload flow
+- Removed references to relational databases (fully committed to MongoDB)
+- Added "Why These Choices" rationale for technology stack
+- Updated Phase 1 checklist to reflect queue publishing completion
 
-### 2026-02-11
+### 2026-02-13 (Afternoon) - Documentation Enhancement
+- Installed ioredis dependency
+- Enhanced documentation structure
+- Added comprehensive API endpoint specifications
+- Documented all three development phases
+- Added database schema with MongoDB indexes
+
+### 2026-02-11 - Initial Scaffold
 - Express service scaffold created
 - TypeScript configuration added
 - Basic route structure established
