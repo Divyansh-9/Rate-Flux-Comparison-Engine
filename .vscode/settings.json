@@ -43,5 +43,8 @@
         "*": false
     },
     "editor.unicodeHighlight.invisibleCharacters": false,
-    "editor.unicodeHighlight.ambiguousCharacters": false
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "files.exclude": {
+        "**/.agent": true
+    }
 }
