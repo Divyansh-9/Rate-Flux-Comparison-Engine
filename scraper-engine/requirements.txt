@@ -1,0 +1,21 @@
+# ── Core ──
+requests==2.32.3
+beautifulsoup4==4.12.3
+lxml==5.2.2
+
+# ── Browser automation ──
+playwright==1.45.0
+
+# ── Data store ──
+pymongo==4.7.3
+
+# ── Queue ──
+redis==5.0.7
+
+# ── Data validation ──
+pydantic==2.7.3
+pydantic-settings==2.3.3
+
+# ── Utilities ──
+python-dotenv==1.0.1
+loguru==0.7.2

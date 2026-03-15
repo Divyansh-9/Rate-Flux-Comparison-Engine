@@ -1,0 +1,47 @@
+{
+    "editor.mouseWheelZoom": true,
+    "code-runner.runInTerminal": true,
+    "files.autoSave": "afterDelay",
+    "workbench.editorAssociations": {
+        "*.msi": "default"
+    },
+    "workbench.iconTheme": "vscode-icons",
+    "livePreview.hostIP": "127.0.0.1:3000",
+    "python.analysis.typeCheckingMode": "basic",
+    "github.copilot.nextEditSuggestions.enabled": true,
+    "python.defaultInterpreterPath": "c:\\Python313\\python.exe",
+    "chat.tools.terminal.autoApprove": {
+        "npm install": true,
+        "npm run dev": true,
+        "/^cd C:\\\\Users\\\\ACER; node \\.\\\\create_linkup_pdf\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^node \\.\\\\create_linkup_pdf\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "&": true,
+        "wsl": true,
+        "Test-Path": true,
+        "npm run build:main": true,
+        "npm run build:preload": true,
+        "Get-Process": true,
+        "npm run electron-rebuild": true,
+        "npx": true,
+        "/^cd \"c:\\\\Users\\\\ACER\\\\Downloads\\\\New folder\\\\YoutubeDownloader-master\\\\YoutubeDownloader\"; powershell -ExecutionPolicy Bypass -File Download-FFmpeg\\.ps1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^dotnet --version$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "Get-Command": true
+    },
+    "github.copilot.enable": {
+        "*": false
+    },
+    "editor.unicodeHighlight.invisibleCharacters": false,
+    "editor.unicodeHighlight.ambiguousCharacters": false
+}
