@@ -12,7 +12,7 @@ const scrapeSchema = z.object({
 scrapeRouter.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { query, retailer } = scrapeSchema.parse(req.body);
-    await enqueueScrapeJob(query, retailer);
+    await enqueueScrapeJob({ query, retailer });
     res.status(202).json({ message: "Scrape job queued", query, retailer });
   } catch (err) {
     next(err);

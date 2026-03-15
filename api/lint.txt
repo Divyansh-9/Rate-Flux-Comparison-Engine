@@ -1,0 +1,14 @@
+﻿
+> price-comparison-api@1.0.0 lint
+> eslint src --ext .ts
+
+
+D:\New folder\Rate-Flux-Comparison-Engine-development\api\src\config\db.ts
+  8:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\New folder\Rate-Flux-Comparison-Engine-development\api\src\lib\redis.ts
+   4:11  warning  'ScrapeJobPayload' is defined but never used  @typescript-eslint/no-unused-vars
+  54:10  warning  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+Γ£û 3 problems (0 errors, 3 warnings)
+

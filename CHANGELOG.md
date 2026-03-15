@@ -10,10 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Integrated **ScraperAPI** proxy logic into `amazon.py` and `flipkart.py` to bypass proactive bot blocking and connection dropped errors.
 - Built an intelligent "Mock Fallback" system in the scraper strategies to return dummy data if `SCRAPER_API_KEY` is not provided in `.env`.
 - Added support for `requests` and `BeautifulSoup` parsing across Amazon and Flipkart grids.
+- Implemented **Zod Data Validation** (`zod`) middleware on product retrieval endpoints.
+- Added **Redis Cache-Aside** architectural pattern to `/api/products/search` (5m TTL).
+- Created `test_e2e.py` to systematically test API architecture, caching speeds, and error handling.
 
 ### Fixed
 - Fixed critical `Dockerfile` entrypoint bug (was pointing to non-existent `src.main` instead of `src.worker`).
 - Fixed critical `worker.py` routing bug where the search query was mistakenly being used to look up the scraper strategy instead of the specified `retailer`.
+- Fixed several TypeScript compilation mismatch errors inside `redis.ts` and `scrape.routes.ts` that were preventing the API Docker container from successfully building.
 
 ### Changed
 - **[BREAKING]** Removed local Playwright dependency logic for scraping in favor of upstream proxy API HTML fetching.

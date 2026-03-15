@@ -1,0 +1,7 @@
+﻿
+> price-comparison-client@1.0.0 type-check
+> tsc --noEmit
+
+src/app/page.tsx(89,15): error TS2322: Type '(retailer: any) => Promise<void>' is not assignable to type '() => void'.
+  Target signature provides too few arguments. Expected 1 or more, but got 0.
+src/app/page.tsx(89,33): error TS7006: Parameter 'retailer' implicitly has an 'any' type.

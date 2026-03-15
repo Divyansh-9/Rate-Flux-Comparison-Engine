@@ -241,8 +241,8 @@ curl http://localhost:5000/health
 **Goal:** Make it WORK end-to-end
 
 **Deliverables:**
-- [ ] Search endpoint implementation
-- [ ] Redis caching layer
+- [x] Search endpoint implementation
+- [x] Redis caching layer
 - [ ] Worker consuming jobs via BRPOP
 - [x] ScraperAPI fetching & BeautifulSoup logic (Amazon strategy)
 - [ ] MongoDB storage schema

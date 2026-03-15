@@ -38,10 +38,6 @@ export async function searchProducts(
 ) {
   try {
     const query = (req.query.q as string) ?? "";
-    if (!query) {
-      res.status(400).json({ message: "Missing query parameter ?q=" });
-      return;
-    }
     const products = await productService.search(query);
     res.json(products);
   } catch (err) {

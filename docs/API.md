@@ -50,7 +50,9 @@ Retrieves all scraped products from the MongoDB storage.
 - **Method:** `GET`
 
 ### Search Products
-Searches against the existing stored products.
+Searches against the existing stored products. 
+
+**Note**: This endpoint utilizes a **Redis Cache-Aside** layer. Identical search queries are cached for 5 minutes (300s) to reduce MongoDB load. All `?q=` queries strict validated via Zod.
 
 - **Endpoint:** `/api/products/search`
 - **Method:** `GET`
